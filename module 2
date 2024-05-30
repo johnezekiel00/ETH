@@ -1,0 +1,233 @@
+import { useState, useEffect } from "react";
+import { ethers } from "ethers";
+import atm_abi from "../artifacts/contracts/Assessment.sol/Assessment.json";
+
+export default function HomePage() {
+  const [ethWallet, setEthWallet] = useState(undefined);
+  const [account, setAccount] = useState(undefined);
+  const [atm, setATM] = useState(undefined);
+  const [balance, setBalance] = useState(undefined);
+  const [form, setForm] = useState({
+    name: '',
+    age: '',
+    sex: '',
+    phoneNumber: '',
+    dateOfBirth: ''
+  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [language, setLanguage] = useState('en');
+
+  const translations = {
+    en: {
+      welcome: "Welcome to the JangBank!",
+      installMetamask: "Please install Metamask in order to use this ATM.",
+      name: "Name:",
+      age: "Age:",
+      sex: "Sex:",
+      phoneNumber: "Phone Number:",
+      dateOfBirth: "Date of Birth:",
+      submit: "Submit",
+      connectWallet: "Please connect your JangBank",
+      yourAccount: "Your Account:",
+      yourBalance: "Your Balance:",
+      deposit: "Deposit 1 ETH",
+      withdraw: "Withdraw 1 ETH",
+      profile: "Profile",
+      about: "About",
+      aboutUsTitle: "About Us",
+      aboutUsText: "Welcome to the JangBank! We provide a seamless way to interact with the Ethereum blockchain, allowing you to deposit and withdraw ETH with ease. Our platform ensures a secure and user-friendly experience.",
+      chooseLanguage: "Choose Language:"
+    },
+    fil: {
+      welcome: "Maligayang pagdating sa JangBank!",
+      installMetamask: "Mangyaring mag-install ng Metamask upang magamit ang ATM na ito.",
+      name: "Pangalan:",
+      age: "Edad:",
+      sex: "Kasarian:",
+      phoneNumber: "Numero ng Telepono:",
+      dateOfBirth: "Petsa ng Kapanganakan:",
+      submit: "Isumite",
+      connectWallet: "Mangyaring ikonekta ang iyong Metamask wallet",
+      yourAccount: "Ang Iyong Account:",
+      yourBalance: "Ang Iyong Balanse:",
+      deposit: "Magdeposito ng 1 ETH",
+      withdraw: "Mag-withdraw ng 1 ETH",
+      profile: "Profile",
+      about: "Tungkol sa",
+      aboutUsTitle: "Tungkol sa Amin",
+      aboutUsText: "Maligayang pagdating sa Metacrafters ATM! Nagbibigay kami ng walang problemang paraan upang makipag-ugnay sa Ethereum blockchain, na nagpapahintulot sa iyo na magdeposito at mag-withdraw ng ETH nang madali. Tinitiyak ng aming platform ang isang ligtas at user-friendly na karanasan.",
+      chooseLanguage: "Pumili ng Wika:"
+    }
+  };
+
+  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const atmABI = atm_abi.abi;
+
+  const getWallet = async () => {
+    if (window.ethereum) {
+      setEthWallet(window.ethereum);
+    }
+
+    if (ethWallet) {
+      const account = await ethWallet.request({ method: "eth_accounts" });
+      handleAccount(account);
+    }
+  };
+
+  const handleAccount = (account) => {
+    if (account) {
+      console.log("Account connected: ", account);
+      setAccount(account);
+    } else {
+      console.log("No account found");
+    }
+  };
+
+  const connectAccount = async () => {
+    if (!ethWallet) {
+      alert('MetaMask wallet is required to connect');
+      return;
+    }
+
+    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
+    handleAccount(accounts);
+
+    // once wallet is set we can get a reference to our deployed contract
+    getATMContract();
+  };
+
+  const getATMContract = () => {
+    const provider = new ethers.providers.Web3Provider(ethWallet);
+    const signer = provider.getSigner();
+    const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
+
+    setATM(atmContract);
+  };
+
+  const getBalance = async () => {
+    if (atm) {
+      setBalance((await atm.getBalance()).toNumber());
+    }
+  };
+
+  const deposit = async () => {
+    if (atm) {
+      let tx = await atm.deposit(1);
+      await tx.wait();
+      getBalance();
+    }
+  };
+
+  const withdraw = async () => {
+    if (atm) {
+      let tx = await atm.withdraw(1);
+      await tx.wait();
+      getBalance();
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setFormSubmitted(true);
+  };
+
+  const initUser = () => {
+    if (!ethWallet) {
+      return <p>{translations[language].installMetamask}</p>
+    }
+
+    if (!formSubmitted) {
+      return (
+        <form onSubmit={handleSubmit}>
+          <div>
+            <label>{translations[language].name}</label>
+            <input type="text" name="name" value={form.name} onChange={handleInputChange} required />
+          </div>
+          <div>
+            <label>{translations[language].age}</label>
+            <input type="number" name="age" value={form.age} onChange={handleInputChange} required />
+          </div>
+          <div>
+            <label>{translations[language].sex}</label>
+            <input type="text" name="sex" value={form.sex} onChange={handleInputChange} required />
+          </div>
+          <div>
+            <label>{translations[language].phoneNumber}</label>
+            <input type="tel" name="phoneNumber" value={form.phoneNumber} onChange={handleInputChange} required />
+          </div>
+          <div>
+            <label>{translations[language].dateOfBirth}</label>
+            <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleInputChange} required />
+          </div>
+          <button type="submit">{translations[language].submit}</button>
+        </form>
+      );
+    }
+
+    if (!account) {
+      return <button onClick={connectAccount}>{translations[language].connectWallet}</button>
+    }
+
+    if (balance == undefined) {
+      getBalance();
+    }
+
+    return (
+      <div>
+        <p>{translations[language].yourAccount} {account}</p>
+        <p>{translations[language].yourBalance} {balance}</p>
+        <button onClick={deposit}>{translations[language].deposit}</button>
+        <button onClick={withdraw}>{translations[language].withdraw}</button>
+        <button onClick={() => setShowProfile(!showProfile)}>{translations[language].profile}</button>
+        <button onClick={() => setShowAbout(!showAbout)}>{translations[language].about}</button>
+        {showProfile && (
+          <div>
+            <p><strong>{translations[language].name}</strong> {form.name}</p>
+            <p><strong>{translations[language].age}</strong> {form.age}</p>
+            <p><strong>{translations[language].sex}</strong> {form.sex}</p>
+            <p><strong>{translations[language].phoneNumber}</strong> {form.phoneNumber}</p>
+            <p><strong>{translations[language].dateOfBirth}</strong> {form.dateOfBirth}</p>
+          </div>
+        )}
+        {showAbout && (
+          <div>
+            <h2>{translations[language].aboutUsTitle}</h2>
+            <p>{translations[language].aboutUsText}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  useEffect(() => { getWallet(); }, []);
+
+  return (
+    <main className="container">
+      <header><h1>{translations[language].welcome}</h1></header>
+      <div>
+        <label>{translations[language].chooseLanguage}</label>
+        <select onChange={(e) => setLanguage(e.target.value)} value={language}>
+          <option value="en">English</option>
+          <option value="fil">Filipino</option>
+        </select>
+      </div>
+      {initUser()}
+      <style jsx>{`
+        .container {
+          text-align: center
+        }
+      `}
+      </style>
+    </main>
+  )
+}
