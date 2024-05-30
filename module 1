@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract JangArt {
+    struct Artwork {
+        address creator;
+        address owner;
+        uint256 royaltyPercentage;
+    }
+
+    mapping(uint256 => Artwork) public artworks;
+
+    event ArtworkCreated(uint256 indexed artworkId, address indexed creator, uint256 royaltyPercentage);
+    event ArtworkSold(uint256 indexed artworkId, address indexed buyer, uint256 price, uint256 royalty);
+
+    function createArtwork(uint256 artworkId, uint256 royaltyPercentage) external {
+        require(royaltyPercentage <= 100, "Royalty percentage too high");
+        require(artworks[artworkId].creator == address(0), "Artwork ID already exists");
+
+        artworks[artworkId] = Artwork({
+            creator: msg.sender,
+            owner: msg.sender,
+            royaltyPercentage: royaltyPercentage
+        });
+
+        emit ArtworkCreated(artworkId, msg.sender, royaltyPercentage);
+    }
+
+    modifier onlyOwner(uint256 artworkId) {
+        require(msg.sender == artworks[artworkId].owner, "Caller is not the owner");
+        _;
+    }
+
+    function sellArtwork(uint256 artworkId, address buyer) external payable onlyOwner(artworkId) {
+        require(buyer != address(0), "Invalid buyer address");
+        require(msg.value > 0, "Sale price must be greater than zero");
+
+        Artwork storage artwork = artworks[artworkId];
+        uint256 royalty = (msg.value * artwork.royaltyPercentage) / 100;
+        payable(artwork.creator).transfer(royalty);
+        payable(artwork.owner).transfer(msg.value - royalty);
+
+        artwork.owner = buyer;
+
+        emit ArtworkSold(artworkId, buyer, msg.value, royalty);
+    }
+}
